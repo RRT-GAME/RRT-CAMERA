@@ -15,8 +15,5 @@ Tactical camera HUD with target tracking overlay. Inspired by Panopticore Target
 3. Open on mobile device
 4. Grant camera permission
 
-## Build APK
-Use PWABuilder.com or Capacitor to build Android APK.
-
 ## License
 MIT
