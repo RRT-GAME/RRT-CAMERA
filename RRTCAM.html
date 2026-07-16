@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>RRT Kamera - Panopticore Target Viewer</title>
+    <meta name="theme-color" content="#00ff41">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #00ff41;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        #video {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            z-index: 1;
+        }
+        
+       .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 2;
+            pointer-events: none;
+        }
+        
+       .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+        }
+        
+       .grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 255, 65, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 65, 0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            opacity: 0.3;
+        }
+        
+       .telemetry {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #00ff41;
+            padding: 10px;
+            font-size: 11px;
+            line-height: 1.6;
+            z-index: 10;
+        }
+        
+       .telemetry-title {
+            color: #00ffff;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+        
+       .crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            border: 2px solid rgba(0, 255, 65, 0.5);
+            border-radius: 50%;
+        }
+        
+       .crosshair::before,.crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(0, 255, 65, 0.8);
+        }
+        
+       .crosshair::before {
+            top: 50%;
+            left: -20px;
+            right: -20px;
+            height: 1px;
+            transform: translateY(-50%);
+        }
+        
+       .crosshair::after {
+            left: 50%;
+            top: -20px;
+            bottom: -20px;
+            width: 1px;
+            transform: translateX(-50%);
+        }
+        
+       .target-box {
+            position: absolute;
+            border: 2px solid #00ffff;
+            background: rgba(0, 255, 255, 0.1);
+            pointer-events: none;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+       .target-label {
+            position: absolute;
+            top: -20px;
+            left: 0;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid #00ffff;
+            padding: 2px 6px;
+            font-size: 10px;
+            white-space: nowrap;
+        }
+        
+       .bottom-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.85);
+            border-top: 2px solid #00ff41;
+            padding: 10px;
+            display: flex;
+            justify-content: space-around;
+            z-index: 10;
+            pointer-events: all;
+        }
+        
+       .btn {
+            background: rgba(0, 255, 65, 0.2);
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            padding: 8px 15px;
+            font-family: inherit;
+            font-size: 11px;
+            cursor: pointer;
+            text-transform: uppercase;
+            pointer-events: all;
+        }
+        
+       .btn:hover {
+            background: rgba(0, 255, 65, 0.4);
+        }
+        
+       .log-console {
+            position: absolute;
+            bottom: 60px;
+            left: 10px;
+            right: 10px;
+            max-height: 100px;
+            overflow-y: hidden;
+            font-size: 10px;
+            line-height: 1.4;
+            opacity: 0.7;
+        }
+        
+       .log-line {
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+       .start-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        
+       .start-screen h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #00ff41;
+        }
+        
+       .start-btn {
+            background: rgba(0, 255, 65, 0.3);
+            border: 2px solid #00ff41;
+            color: #00ff41;
+            padding: 15px 40px;
+            font-size: 16px;
+            font-family: inherit;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+        
+       .thermal {
+            filter: sepia(1) hue-rotate(180deg) saturate(3) contrast(1.2);
+        }
+        
+       .error-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 0, 0, 0.9);
+            border: 2px solid #ff0000;
+            padding: 20px;
+            text-align: center;
+            z-index: 50;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="start-screen" id="startScreen">
+        <h1>RRT KAMERA</h1>
+        <p style="margin-bottom: 30px; opacity: 0.7;">PANOPTICORE TARGET VIEWER v1.0</p>
+        <button class="start-btn" onclick="startCamera()">START SCAN</button>
+        <p style="margin-top: 20px; font-size: 10px; opacity: 0.5;">Requires camera permission + HTTPS</p>
+    </div>
+    
+    <video id="video" autoplay playsinline muted></video>
+    
+    <div class="overlay">
+        <div class="scanlines"></div>
+        <div class="grid"></div>
+        
+        <div class="telemetry">
+            <div class="telemetry-title">RRT TELEMETRY // ACTIVE</div>
+            <div>PITCH: <span id="pitch">-84.9</span>°</div>
+            <div>ROLL: <span id="roll">-1.9</span>°</div>
+            <div>GPS: <span id="gps">46.783979, -92.09758</span></div>
+            <div>FPS: <span id="fps">59.8</span></div>
+            <div>MODE: <span id="mode">RGB COLOR</span></div>
+            <div>STATUS: <span id="status">TRACKING</span></div>
+        </div>
+        
+        <div class="crosshair"></div>
+        
+        <div class="log-console" id="logs"></div>
+        
+        <div class="bottom-bar">
+            <button class="btn" onclick="toggleThermal()">THERMAL</button>
+            <button class="btn" onclick="makeReport()">REPORT</button>
+            <button class="btn" onclick="toggleMinimap()">MINIMAP</button>
+            <button class="btn" onclick="location.reload()">RESET</button>
+        </div>
+    </div>
+    
+    <script>
+        let video = document.getElementById('video');
+        let isThermal = false;
+        let targets = [];
+        
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' },
+                    audio: false 
+                });
+                video.srcObject = stream;
+                document.getElementById('startScreen').style.display = 'none';
+                startTelemetry();
+                spawnTargets();
+                logMessage('CAMERA INITIALIZED');
+                logMessage('RRT KAMERA SYSTEM ONLINE');
+            } catch (err) {
+                showError('CAMERA ACCESS DENIED<br>Permission denied. Ensure HTTPS and camera permissions are enabled.');
+                console.error(err);
+            }
+        }
+        
+        function showError(msg) {
+            const errorBox = document.createElement('div');
+            errorBox.className = 'error-box';
+            errorBox.innerHTML = msg;
+            document.body.appendChild(errorBox);
+        }
+        
+        function startTelemetry() {
+            setInterval(() => {
+                document.getElementById('pitch').textContent = (Math.random() * 180 - 90).toFixed(1);
+                document.getElementById('roll').textContent = (Math.random() * 10 - 5).toFixed(1);
+                document.getElementById('fps').textContent = (58 + Math.random() * 4).toFixed(1);
+            }, 500);
+            
+            setInterval(() => {
+                const messages = [
+                    'TARGET ACQUIRED',
+                    'SCANNING SECTOR 7',
+                    'MOTION DETECTED',
+                    'UPDATING TELEMETRY',
+                    'TRACKING ACTIVE',
+                    'SIGNAL LOCK: STRONG',
+                    'PROCESSING FRAME DATA'
+                ];
+                logMessage(messages[Math.floor(Math.random() * messages.length)]);
+            }, 2000);
+        }
+        
+        function logMessage(msg) {
+            const logs = document.getElementById('logs');
+            const line = document.createElement('div');
+            line.className = 'log-line';
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logs.appendChild(line);
+            if (logs.children.length > 5) {
+                logs.removeChild(logs.children[0]);
+            }
+        }
+        
+        function spawnTargets() {
+            setInterval(() => {
+                if (targets.length < 4 && Math.random() > 0.5) {
+                    createTarget();
+                }
+            }, 3000);
+        }
+        
+        function createTarget() {
+            const target = document.createElement('div');
+            target.className = 'target-box';
+            const size = 60 + Math.random() * 80;
+            const x = Math.random() * (window.innerWidth - size);
+            const y = Math.random() * (window.innerHeight - size - 100);
+            
+            target.style.width = size + 'px';
+            target.style.height = size + 'px';
+            target.style.left = x + 'px';
+            target.style.top = y + 'px';
+            
+            const label = document.createElement('div');
+            label.className = 'target-label';
+            label.textContent = `CAR ${(60 + Math.random() * 35).toFixed(0)}%`;
+            target.appendChild(label);
+            
+            document.querySelector('.overlay').appendChild(target);
+            targets.push(target);
+            
+            setTimeout(() => {
+                target.remove();
+                targets = targets.filter(t => t!== target);
+            }, 5000 + Math.random() * 5000);
+        }
+        
+        function toggleThermal() {
+            isThermal =!isThermal;
+            video.classList.toggle('thermal');
+            document.getElementById('mode').textContent = isThermal? 'HEAT' : 'RGB COLOR';
+            logMessage(isThermal? 'THERMAL MODE ACTIVE' : 'RGB MODE ACTIVE');
+        }
+        
+        function makeReport() {
+            logMessage('GENERATING REPORT...');
+            setTimeout(() => logMessage('REPORT SAVED: /rrt/logs/targets.json'), 1000);
+        }
+        
+        function toggleMinimap() {
+            logMessage('MINIMAP TOGGLE: NOT IMPLEMENTED');
+        }
+    </script>
+</body>
+</html>
